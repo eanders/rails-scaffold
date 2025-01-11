@@ -75,7 +75,7 @@ services:
         condition: service_started
 
   redis:
-    container_name: rails-react-redis
+    container_name: ${APP_NAME}-redis
     image: redis:alpine
     volumes:
       - redis:/data
