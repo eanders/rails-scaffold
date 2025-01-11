@@ -1,0 +1,126 @@
+x-app: &app
+  image: rails-react:0.1
+  build:
+    context: .
+    dockerfile: docker/app/Dockerfile
+    target: dev-build
+    args:
+      RUBY_VERSION: 3.4.1
+      BUNDLER_VERSION: '2.6.2'
+      USER_ID: ${USER_ID:-1001}
+      GROUP_ID: ${GROUP_ID:-1001}
+      BUILD_TAG: bullseye
+      APP_NAME: ${APP_NAME:-rails-react}
+      BUNDLE_GEMFILE: ${BUNDLE_GEMFILE:-/app/Gemfile}
+  environment: &env
+    HISTFILE: /app/log/.bash_history
+    PSQL_HISTFILE: /app/log/.psql_history
+    EDITOR: vi
+
+  env_file:
+    - .env.development.local
+
+x-backend: &backend
+  <<: *app
+  stdin_open: true
+  tty: true
+  volumes:
+    - .:/app:cached
+    - rails_cache_docker:/app/tmp/cache
+    - bundle_docker:/bundle
+    - /usr/local/share/ca-certificates:/usr/local/share/ca-certificates
+    - /etc/ssl/certs:/etc/ssl/certs
+services:
+  shell:
+    <<: *backend
+    profiles:
+      - manual
+    command: /bin/bash
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  web:
+    <<: *backend
+    container_name: ${APP_NAME}-web
+    stdin_open: true
+    tty: true
+    command: bin/rails server -b 0.0.0.0
+    labels:
+      - traefik.enable=${TRAEFIK_ENABLED:-false}
+      - traefik.http.routers.op.entrypoints=web
+      - traefik.http.routers.op.rule=Host(`${FQDN:-rails-react.dev.test}`)
+      - traefik.http.services.op_https.loadbalancer.server.port=3000
+      - traefik.http.routers.op_https.rule=Host(`${FQDN:-rails-react.dev.test}`)
+      - traefik.http.routers.op_https.tls=true
+      - traefik.http.routers.op_https.entrypoints=web-secure
+      - traefik.http.middlewares.op_https.redirectscheme.scheme=https
+      - traefik.http.routers.op.middlewares=op_https
+    ports:
+      - "3000"
+      - "9394"
+    expose:
+      - "3000"
+      - "9394"
+    environment:
+      <<: *env
+      VIRTUAL_HOST: ${FQDN:-${APP_NAME}.dev.test}
+      VIRTUAL_PORT: 3000
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  redis:
+    container_name: rails-react-redis
+    image: redis:alpine
+    volumes:
+      - redis:/data
+    expose:
+      - 6379
+
+  db:
+    build:
+      context: docker/pg17
+      shm_size: 1g
+    container_name: db
+    image: pg:17
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_MULTIPLE_EXTENSIONS: postgis,hstore
+      PGPASSWORD: postgres
+      PGUSER: postgres
+    healthcheck:
+      test: ["CMD-SHELL", "sh -c 'pg_isready -d postgres'"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    volumes:
+      # You may want to store your db data locally rather than in a docker volume
+      # to do that, set DB_DATA_VOLUME in your env or use a docker override file
+      # For example:
+      #   DB_DATA_VOLUME=./dev/pg17_data
+      - ${DB_DATA_VOLUME:-dbdata_pg17}:/var/lib/postgresql/data
+      - ./tmp/dumps:/tmp/dumps
+      - ./db:/mnt
+    ports:
+      - 5432:5432
+    expose:
+      - 5432
+    stop_grace_period: 30s
+    shm_size: 1g # used during vacuum operations
+
+volumes:
+  bundle_docker:
+  rails_cache_docker:
+  dbdata_pg17:
+  redis:
+
+networks:
+  default:
+    name: traefik
+    external: true
