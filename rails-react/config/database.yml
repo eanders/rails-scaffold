@@ -1,25 +1,32 @@
-# SQLite. Versions 3.8.0 and up are supported.
-#   gem install sqlite3
-#
-#   Ensure the SQLite 3 gem is defined in your Gemfile
-#   gem "sqlite3"
-#
 default: &default
-  adapter: sqlite3
+  adapter: postgis
   pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
   timeout: 5000
+  variables:
+    # random_page_cost: Cost of a non-sequentially fetched disk page
+    # Set to 1.1 because our databases use SSDs, making random access almost as efficient as sequential.
+    # This setting helps the query planner make more accurate decisions about index usage.
+    random_page_cost: 1.1
+    # seq_page_cost: Cost of a sequentially fetched disk page
+    # Set to 1 (default value) to maintain consistency with our adjusted random_page_cost.
+    # This ensures a balanced cost model for the query planner when comparing sequential vs. index scans.
+    seq_page_cost: 1
+    # work_mem: Memory used for sort operations and hash tables per operation
+    # Increased to 8MB to potentially improve performance for queries involving large sorts or hash operations.
+    # Be cautious: setting this too high can lead to excessive memory usage, especially on busy systems with many concurrent operations.
+    # Monitor memory usage and adjust as needed based on your workload and available resources.
+    work_mem: 8MB
 
 development:
   <<: *default
-  database: storage/development.sqlite3
+  url: <%= ENV.fetch("DATABASE_URL_PRIMARY") %>
 
 # Warning: The database defined as "test" will be erased and
 # re-generated from your development database when you run "rake".
 # Do not set this db to the same as development or production.
 test:
   <<: *default
-  database: storage/test.sqlite3
-
+  url: <%= ENV.fetch("DATABASE_URL_TEST") %>
 
 # Store production database in the storage/ directory, which by default
 # is mounted as a persistent Docker volume in config/deploy.yml.

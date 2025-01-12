@@ -54,18 +54,11 @@ RUN groupadd -g ${GROUP_ID} app-user \
   && mkdir /app /bundle \
   && chown app-user:app-user /bundle /app
 
+COPY docker/app/dependencies.txt /tmp/dependencies.txt
+
 RUN apt-get update -qq \
   && apt-get upgrade \
-  && apt-get -y install \
-  libjemalloc2 \
-  libvips \
-  tzdata \
-  git \
-  pkg-config \
-  bash \
-  curl \
-  tar p7zip vim gpg gpg-agent \
-  build-essential rustc libssl-dev libyaml-dev zlib1g-dev libgmp-dev \
+  && apt-get -y install $(cat /tmp/dependencies.txt)\
   && rm -rf /var/lib/apt/lists /var/cache/apt/archives
 
 WORKDIR /app
