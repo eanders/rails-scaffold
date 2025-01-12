@@ -25,7 +25,7 @@ x-backend: &backend
   stdin_open: true
   tty: true
   volumes:
-    - .:/app:cached
+    - ./rails:/app:cached
     - rails_cache_docker:/app/tmp/cache
     - bundle_docker:/bundle
     - /usr/local/share/ca-certificates:/usr/local/share/ca-certificates
@@ -94,6 +94,7 @@ services:
       POSTGRES_MULTIPLE_EXTENSIONS: postgis,hstore
       PGPASSWORD: postgres
       PGUSER: postgres
+      DB_DATA_VOLUME: ${DB_DATA_VOLUME:-pg17_data}
     healthcheck:
       test: ["CMD-SHELL", "sh -c 'pg_isready -d postgres'"]
       interval: 10s
@@ -104,9 +105,9 @@ services:
       # to do that, set DB_DATA_VOLUME in your env or use a docker override file
       # For example:
       #   DB_DATA_VOLUME=./dev/pg17_data
-      - ${DB_DATA_VOLUME:-dbdata_pg17}:/var/lib/postgresql/data
-      - ./tmp/dumps:/tmp/dumps
-      - ./db:/mnt
+      - ${DB_DATA_VOLUME}:/var/lib/postgresql/data
+      - ./rails/tmp/dumps:/tmp/dumps
+      - ./rails/db:/mnt
     ports:
       - 5432:5432
     expose:
@@ -117,7 +118,7 @@ services:
 volumes:
   bundle_docker:
   rails_cache_docker:
-  dbdata_pg17:
+  pg17_data:
   redis:
 
 networks:
