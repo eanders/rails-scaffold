@@ -2,7 +2,7 @@ x-app: &app
   image: rails-react:0.1
   build:
     context: .
-    dockerfile: docker/app/Dockerfile
+    dockerfile: docker/rails/Dockerfile
     target: dev-build
     args:
       RUBY_VERSION: 3.4.1
